@@ -1,0 +1,16 @@
+Locust headless summary — concurrency 10, run time 60s
+
+Aggregated:
+- Requests: 13
+- Failures: 0
+- RPS: 0.23
+- Median/P50: 27000 ms
+- Average: 27639.9 ms
+- Min: 5894.6 ms
+- Max: 42049.4 ms
+- P95: 42000 ms
+- P99: 42000 ms
+
+Endpoint rows:
+- short: 12 requests, 0 failures, P50 33000 ms, P95 42000 ms
+- long-rag: 1 request, 0 failures, P50 15000 ms, P95 15000 ms

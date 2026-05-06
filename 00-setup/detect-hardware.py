@@ -13,6 +13,7 @@ import platform
 import shutil
 import subprocess
 import sys
+import ctypes
 from pathlib import Path
 
 
@@ -61,6 +62,8 @@ def detect_cpu() -> dict:
                 elif line.startswith("NumberOfCores="):
                     val = line.split("=", 1)[1].strip()
                     info["cores_physical"] = int(val) if val.isdigit() else None
+        if not info.get("model") or info.get("model") == "unknown":
+            info["model"] = platform.processor() or os.environ.get("PROCESSOR_IDENTIFIER", "unknown")
     info.setdefault("model", "unknown")
     info.setdefault("cores_physical", info["cores_logical"])
     return info
@@ -80,6 +83,24 @@ def detect_ram_gb() -> float:
         except OSError:
             return 0.0
     if sys_plat == "win32":
+        class MEMORYSTATUSEX(ctypes.Structure):
+            _fields_ = [
+                ("dwLength", ctypes.c_ulong),
+                ("dwMemoryLoad", ctypes.c_ulong),
+                ("ullTotalPhys", ctypes.c_ulonglong),
+                ("ullAvailPhys", ctypes.c_ulonglong),
+                ("ullTotalPageFile", ctypes.c_ulonglong),
+                ("ullAvailPageFile", ctypes.c_ulonglong),
+                ("ullTotalVirtual", ctypes.c_ulonglong),
+                ("ullAvailVirtual", ctypes.c_ulonglong),
+                ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
+            ]
+
+        status = MEMORYSTATUSEX()
+        status.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
+        if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+            return round(status.ullTotalPhys / 1024**3, 1)
+
         rc, out = run(["wmic", "computersystem", "get", "TotalPhysicalMemory", "/format:value"])
         for line in out.splitlines():
             if line.startswith("TotalPhysicalMemory="):

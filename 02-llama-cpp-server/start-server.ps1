@@ -3,8 +3,11 @@
 $ErrorActionPreference = 'Stop'
 Set-Location (Join-Path $PSScriptRoot '..')
 
-$model   = python -c 'import json; print(json.load(open("models/active.json"))["primary_model"])'
-$threads = python -c 'import json; hw=json.load(open("hardware.json")); print(hw["cpu"].get("cores_physical") or 4)'
+$python  = if (Test-Path '.\.venv\Scripts\python.exe') { '.\.venv\Scripts\python.exe' } else { 'python' }
+$active  = Get-Content 'models\active.json' -Raw | ConvertFrom-Json
+$hw      = Get-Content 'hardware.json' -Raw | ConvertFrom-Json
+$model   = $active.primary_model
+$threads = if ($hw.cpu.cores_physical) { $hw.cpu.cores_physical } else { 4 }
 $gpu     = if ($env:LAB_N_GPU_LAYERS) { $env:LAB_N_GPU_LAYERS } else { '99' }
 $ctx     = if ($env:LAB_N_CTX) { $env:LAB_N_CTX } else { '2048' }
 
@@ -16,7 +19,7 @@ Write-Host "    ctx       : $ctx"
 Write-Host "    listening : http://0.0.0.0:8080"
 Write-Host ""
 
-python -m llama_cpp.server `
+& $python 02-llama-cpp-server\local_server.py `
     --model "$model" `
     --host 0.0.0.0 --port 8080 `
     --n_threads $threads `

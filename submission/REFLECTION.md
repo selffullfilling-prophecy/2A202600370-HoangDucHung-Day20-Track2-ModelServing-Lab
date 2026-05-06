@@ -1,120 +1,100 @@
 # Reflection — Lab 20 (Personal Report)
 
-> **Đây là báo cáo cá nhân.** Mỗi học viên chạy lab trên laptop của mình, với spec của mình. Số liệu của bạn không so sánh được với bạn cùng lớp — chỉ so sánh **before vs after trên chính máy bạn**. Grade rubric tính theo độ rõ ràng của setup + tuning của bạn, không phải tốc độ tuyệt đối.
-
----
-
-**Họ Tên:** _<Họ Tên>_
-**Cohort:** _<A20-K1 / A20-K2 / ...>_
-**Ngày submit:** _<YYYY-MM-DD>_
+**Họ Tên:** Hoang Duc Hung
+**Cohort:** A20
+**Ngày submit:** 2026-05-06
 
 ---
 
 ## 1. Hardware spec (từ `00-setup/detect-hardware.py`)
 
-> Paste output của `python 00-setup/detect-hardware.py` vào đây, hoặc điền thủ công:
+- **OS:** Windows 10 AMD64
+- **CPU:** unknown from Windows probe; detected 12 physical / 12 logical cores
+- **Cores:** 12 physical / 12 logical
+- **CPU extensions:** not reported by Windows probe
+- **RAM:** 15.4 GB usable, laptop advertised 16 GB
+- **Accelerator:** NVIDIA GeForce RTX 3050 Laptop GPU, 4096 MiB
+- **llama.cpp backend đã chọn:** CPU wheel for the core run; CUDA detected but not used because the local Windows wheel was CPU-only
+- **Recommended model tier:** Qwen2.5-1.5B-Instruct Q4_K_M
 
-- **OS:** _<macOS 14 / Windows 11 / Ubuntu 24.04 / ...>_
-- **CPU:** _<Apple M2 / Intel i7-12700H / AMD Ryzen 7 5800H / ...>_
-- **Cores:** _<physical / logical>_
-- **CPU extensions:** _<AVX2 / AVX-512 / NEON / —>_
-- **RAM:** _<GB>_
-- **Accelerator:** _<NVIDIA RTX 4060 8GB / Apple Metal / AMD ROCm / Vulkan / CPU only>_
-- **llama.cpp backend đã chọn:** _<CUDA / Metal / Vulkan / CPU>_
-- **Recommended model tier:** _<TinyLlama-1.1B / Qwen2.5-1.5B / Llama-3.2-3B / Qwen2.5-7B>_
-
-**Setup story** (≤ 80 chữ): những gì cần thay đổi để lab chạy được trên máy bạn (vd: dùng WSL2, install CUDA Toolkit, fall back sang Vulkan vì ROCm phiên bản kén, tắt antivirus để pip install nhanh hơn, v.v.):
-
-_Answer here._
+**Setup story** (≤ 80 chữ): Windows WMI did not report RAM correctly in the original probe, so I fixed the probe to use the Windows memory API. `llama-cpp-python` source install hit Windows long-path errors, so I installed the prebuilt CPU wheel from the llama-cpp-python wheel index.
 
 ---
 
 ## 2. Track 01 — Quickstart numbers (từ `benchmarks/01-quickstart-results.md`)
 
-> Paste bảng từ `benchmarks/01-quickstart-results.md` xuống đây (auto-generated bởi `python 01-llama-cpp-quickstart/benchmark.py`).
-
 | Model | Load (ms) | TTFT P50/P95 (ms) | TPOT P50/P95 (ms) | E2E P50/P95/P99 (ms) | Decode rate (tok/s) |
 |---|--:|--:|--:|--:|--:|
-| (Q4_K_M) | | | | | |
-| (Q2_K)   | | | | | |
+| qwen2.5-1.5b-instruct-q4_k_m.gguf | 1436 | 154 / 206 | 47.2 / 51.3 | 2967 / 3432 / 3439 | 21.2 |
+| qwen2.5-1.5b-instruct-q2_k.gguf | 432 | 176 / 268 | 36.8 / 47.4 | 2493 / 3252 / 3261 | 27.2 |
 
-**Một quan sát** (≤ 50 chữ): Q4_K_M vs Q2_K trên máy bạn — số liệu nói gì? Quality đáng đánh đổi không?
-
-_Answer here._
+**Một quan sát** (≤ 50 chữ): Q2_K decoded about 28% faster by TPOT, but Q4_K_M is still fast enough on CPU and should preserve better answer quality. For this laptop, Q4_K_M is the better default unless memory is very tight.
 
 ---
 
 ## 3. Track 02 — llama-server load test
 
-> Chạy 2 lần locust ở concurrency 10 và 50, paste tóm tắt bên dưới.
-
 | Concurrency | Total RPS | TTFB P50 (ms) | E2E P95 (ms) | E2E P99 (ms) | Failures |
 |--:|--:|--:|--:|--:|--:|
-| 10 | | | | | |
-| 50 | | | | | |
+| 10 | 0.23 | 27000 | 42000 | 42000 | 0 |
+| 50 | 0.22 | 15000 | 38000 | 38000 | 0 |
 
-**KV-cache observation** (từ `record-metrics.py`): peak `llamacpp:kv_cache_usage_ratio` ở concurrency 50 = _<0.XX>_, nghĩa là …
-
-_Answer here._
+**KV-cache observation** (từ `record-metrics.py`): peak `llamacpp:kv_cache_usage_ratio` ở concurrency 50 = `0.0459`, nghĩa là prompt/context trong load test vẫn nhỏ so với `n_ctx=2048`. Bottleneck chính là CPU decode/queueing, không phải KV-cache capacity.
 
 ---
 
 ## 4. Track 03 — Milestone integration
 
-- **N16 (Cloud/IaC):** _<piece you connected — k3d cluster / GCP project / docker-compose / "stub: localhost only">_
-- **N17 (Data pipeline):** _<piece — Airflow DAG / batch job / "stub: in-memory dict">_
-- **N18 (Lakehouse):** _<piece — Delta Lake table / Iceberg / "stub: SQLite">_
-- **N19 (Vector + Feature Store):** _<piece — Qdrant index / Feast / "stub: TOY_DOCS">_
+- **N16 (Cloud/IaC):** stub: localhost-only serving endpoint
+- **N17 (Data pipeline):** stub: static in-memory document list
+- **N18 (Lakehouse):** stub: in-memory records instead of Delta/Iceberg
+- **N19 (Vector + Feature Store):** stub: toy keyword retrieval over `TOY_DOCS`
 
 **Nơi tốn nhiều ms nhất** trong pipeline (đo bằng `time.perf_counter` trong `pipeline.py`):
 
-- embed: _<ms>_
-- retrieve: _<ms>_
-- llama-server: _<ms>_
+- embed: 0.0 ms, no embedding model in the stub path
+- retrieve: 0.0–0.1 ms
+- llama-server: 5194.2–10561.1 ms
 
-**Reflection** (≤ 60 chữ): bottleneck nằm ở đâu? Có khớp với kỳ vọng không?
-
-_Answer here._
+**Reflection** (≤ 60 chữ): Bottleneck nằm hoàn toàn ở llama-server call. Retrieval gần như miễn phí vì chỉ là keyword overlap trong memory. Điều này khớp kỳ vọng: với local CPU wheel, decode latency dominates; một vector store thật sẽ chỉ đáng kể nếu remote/network hoặc embedding model chậm.
 
 ---
 
 ## 5. Bonus — The single change that mattered most
 
-> **Most important section.** Pick **một** thay đổi từ bonus track (build flag, thread sweep, quant pick, GPU offload, KV-cache quantization, speculative decoding, bất cứ challenge nào trong `BONUS-llama-cpp-optimization/CHALLENGES.md`) đã tạo ra speedup lớn nhất trên máy bạn.
+**Change:** Dùng CPU-safe serving path với custom FastAPI wrapper có `/metrics`, thay vì cố chạy `python -m llama_cpp.server --metrics` trên wheel Windows không hỗ trợ flag này.
 
-**Change:** _<vd: rebuild llama.cpp với `-DGGML_NATIVE=ON -DGGML_BLAS=ON`; vd: hạ `-t` từ 12 xuống 6; vd: bật Metal trên M2>_
+**Before vs after**:
 
-**Before vs after** (paste 2-3 dòng từ sweep output):
-
-```
-before: <số liệu>
-after:  <số liệu>
-speedup: ~<X.Y>×
+```text
+before: llama_cpp.server exited with "unrecognized arguments: --metrics"; no /metrics evidence
+after:  smoke test passed; /metrics showed llamacpp:tokens_predicted_total 23 and kv_cache_usage_ratio 0.0229
+speedup: not a throughput speedup; it changed the setup from ungradable to measurable
 ```
 
-**Tại sao nó work** (1–2 đoạn ngắn — đây là phần grader đọc kỹ nhất):
+**Tại sao nó work**:
 
-_Giải thích như đang nói với một bạn cùng lớp đang ngồi cạnh. Tránh "vibes-based" reasoning — bám vào mô hình mental của hardware (memory bandwidth? compute? cache?). Nếu kết quả khác kỳ vọng từ deck, nói rõ — đó là phần grader thưởng điểm._
+The grading bottleneck was observability, not raw model speed. The installed Windows CPU wheel could generate text, but the server entrypoint did not expose the native llama.cpp metrics flag required by the rubric. Wrapping the same `Llama` object behind FastAPI kept the OpenAI-compatible `/v1/chat/completions` shape while adding Prometheus-style counters with the exact metric names used by the lab scripts.
+
+This also made the system honest about the hardware path. CUDA was detected, but the installed wheel was CPU-only, so forcing `LAB_N_GPU_LAYERS=0` avoided fake GPU offload and produced reproducible CPU numbers. The load test then showed the real limitation: requests queue behind decode, so P95 grows even though KV-cache usage remains low.
 
 ---
 
 ## 6. (Optional) Điều ngạc nhiên nhất
 
-_(1–2 câu — không bắt buộc, nhưng người grader đọc tất cả)_
-
-_Answer here._
+The advertised 16 GB laptop appeared as 15.4 GB usable RAM, which changed the auto-selected model tier from the 3B row to the safer 1.5B row. That was a good reminder to tune from measured available resources, not marketing specs.
 
 ---
 
 ## 7. Self-graded checklist
 
-- [ ] `hardware.json` đã commit
-- [ ] `models/active.json` đã commit (hoặc paste path snapshot vào section 1)
-- [ ] `benchmarks/01-quickstart-results.md` đã commit
-- [ ] `benchmarks/02-server-results.md` (hoặc CSV từ `record-metrics.py`) đã commit
+- [x] `hardware.json` đã commit
+- [x] `models/active.json` đã commit
+- [x] `benchmarks/01-quickstart-results.md` đã commit
+- [x] `benchmarks/02-server-results.md` (hoặc CSV từ `record-metrics.py`) đã commit
 - [ ] `benchmarks/bonus-*.md` đã commit (ít nhất 1 sweep)
-- [ ] Ít nhất 6 screenshots trong `submission/screenshots/` (xem `submission/screenshots/README.md`)
-- [ ] `make verify` exit 0 (chạy ngay trước khi push)
+- [x] Ít nhất 6 screenshots trong `submission/screenshots/` (xem `submission/screenshots/README.md`)
+- [x] `make verify` exit 0 (chạy ngay trước khi push)
 - [ ] Repo trên GitHub ở chế độ **public**
 - [ ] Đã paste public repo URL vào VinUni LMS
 

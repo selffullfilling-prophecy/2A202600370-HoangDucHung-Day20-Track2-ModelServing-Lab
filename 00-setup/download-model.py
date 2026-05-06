@@ -103,8 +103,8 @@ def main() -> int:
     config = {
         "tier": tier_key,
         "repo_id": repo_id,
-        "primary_model": str(primary),
-        "compare_model": str(compare),
+        "primary_model": primary.as_posix(),
+        "compare_model": compare.as_posix(),
     }
     Path("models/active.json").write_text(json.dumps(config, indent=2))
     print("\nWrote models/active.json — quickstart and bonus scripts read this.")
